@@ -1,0 +1,48 @@
+Transform: AWS::Serverless-2016-10-31
+
+Resources:
+  SampleApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: prod
+      Cors: "'*'"
+      Auth:
+        DefaultAuthorizer: CognitoAuthorizer
+        Authorizers:
+          CognitoAuthorizer:
+            UserPoolArn: !GetAtt CognitoUserPool.Arn
+
+  HelloWorldFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./src
+      Handler: lambda.handler
+      Runtime: nodejs20.x
+      Events:
+        Root:
+          Type: Api
+          Properties:
+            RestApiId: !Ref SampleApi
+            Path: /
+            Method: GET
+
+  CognitoUserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: !Sub "${AWS::StackName}-auth"
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 8
+      UsernameAttributes:
+        - email
+      Schema:
+        - AttributeDataType: String
+          Name: email
+          Required: false
+
+  CognitoUserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      UserPoolId: !Ref CognitoUserPool
+      ClientName: !Sub "${AWS::StackName}-client"
+      GenerateSecret: false
