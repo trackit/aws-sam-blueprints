@@ -1,0 +1,66 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: DynamoDB Streams Sample
+
+Globals:
+  Function:
+    Timeout: 60
+    Architectures:
+      - x86_64
+    Handler: handler.default
+    Runtime: nodejs20.x
+    Tags:
+      Owner: Nathan Agez
+      Project: SAM Samples
+      Name: DynamoDB Streams to OpenSearch
+
+Resources:
+  SingleTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      StreamSpecification:
+        StreamViewType: NEW_AND_OLD_IMAGES
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S
+        - AttributeName: SK
+          AttributeType: S
+      KeySchema:
+        - AttributeName: PK
+          KeyType: HASH
+        - AttributeName: SK
+          KeyType: RANGE
+      Tags:
+        - Key: Project
+          Value: SAM Samples
+        - Key: Name
+          Value: DynamoDB Streams to OpenSearch
+        - Key: Owner
+          Value: Nathan Agez
+
+  StreamProcessor:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./
+      Description: Process MediaConvert events Event Bridge listens to
+      Events:
+        DDBStreams:
+          Type: DynamoDB
+          Properties:
+            Stream: !GetAtt SingleTable.StreamArn
+            StartingPosition: LATEST
+            FunctionResponseTypes:
+              - ReportBatchItemFailures
+      Policies:
+        - DynamoDBStreamReadPolicy:
+            TableName: !Ref SingleTable
+            StreamName: !Select [3, !Split ["/", !GetAtt SingleTable.StreamArn]]
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: es2020
+        Sourcemap: true
+        EntryPoints:
+          - src/stream-processor/handler.ts
